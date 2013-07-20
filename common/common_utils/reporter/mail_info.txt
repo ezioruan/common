@@ -1,0 +1,11 @@
+﻿mail_id 标记邮件信息的ID																				
+subject	邮件的主题
+info	邮件简明扼要的正文信息，如：xxx错误发生了
+limit_interval 通知间隔，即在此段时间内，相同的邮件只发一次（单位毫秒）
+#-------------------------------------------------------------------------------------																									
+mail_id	subject	info	limit_interval
+1	最后定稿	这是个测试邮件	60000
+2	gameserver的twisted报错	错误内容:\n	60000
+3	gameserver的报ERROR级别错误	错误内容:\n	60000
+4	gameserver的报FATAL级别错误	错误内容:\n	60000
+5	coreserver的twisted报错	错误内容:\n	60000

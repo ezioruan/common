@@ -1,0 +1,10 @@
+jsonpickle==0.4.0
+ujson==1.19
+pycrypto==2.3
+DBUtils==1.1
+jinja==2.6
+MySQL_python==1.2.3
+pyOpenSSL==0.13
+Twisted==12.2
+zope.interface==4.0.1
+protobuf==2.4.1

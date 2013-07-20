@@ -1,0 +1,4 @@
+hanlde_id	need_status	handler	protobuf_cls	access_interval	deal_interval
+处理的主键	需要的状态	处理的函数	收到的数据的实例类	访问的间隔	处理的间隔
+1	0x1	handle1	ProtoBufTest1	1	1
+2	0x2	handle2	ProtoBufTest2	1	1

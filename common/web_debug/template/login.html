@@ -1,0 +1,16 @@
+﻿{% extends 'base.html' %}
+
+{% block body %}
+<div class="hero-unit container">
+	
+<form class="well" accept-charset="UTF-8" action="/login" method="post">
+	<label>Login Code</label>
+	<input type="text" class="span3" placeholder="Type Login Code" name="login_code">
+	<br>
+	<button type="submit" class="btn">
+		Login
+	</button>
+</form>
+</div>
+
+{% endblock %}

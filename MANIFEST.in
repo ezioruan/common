@@ -1,0 +1,4 @@
+include *.txt *.py *.sh
+exclude *.pyc
+recursive-include common/web_debug/static *
+recursive-include common/web_debug/template *

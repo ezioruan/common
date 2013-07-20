@@ -1,0 +1,669 @@
+{% extends 'base.html' %}
+{% block head_extend %}
+<link href="/static/css/codemirror.css" rel="stylesheet" type="text/css">
+<script type="text/javascript" src="/static/js/codemirror.js"></script>
+<script type="text/javascript" src="/static/js/python.js"></script>
+{% endblock %}
+{% block body %}
+<style>
+	.myModule {
+		width: 200px;
+	}
+</style>
+<script type="text/javascript">
+    $(document).ready(function() {
+        $('#codeSource').empty();
+        $('#console').empty();
+        $('#loading').hide();
+
+        var editor = CodeMirror.fromTextArea(document.getElementById("codeSource"), {
+            mode : {
+                name : "python",
+                version : 2,
+                singleLineStringErrors : true,
+            },
+            theme : 'solarized',
+            lineNumbers : true,
+            indentUnit : 4,
+            tabMode : "shift",
+            matchBrackets : true
+        });
+        editor.focus();
+        editor.setSize('100%', 450);
+
+        var console = CodeMirror.fromTextArea(document.getElementById("console"), {
+            mode : {
+                name : "python",
+                version : 2,
+                singleLineStringErrors : false
+            },
+            theme : 'monokai',
+            readOnly : true,
+            lineNumbers : true,
+            indentUnit : 4,
+            tabMode : "shift",
+            matchBrackets : true
+        });
+        console.setSize('100%', 320);
+
+        function write2Console(value) {
+            context = console.getValue();
+            console.setValue(context + value);
+        }
+
+        function runRemoteCode(url, data) {
+            $.ajax({
+                url : url,
+                data : data,
+                type : 'post',
+                beforeSend : function() {
+                    $('#loading').show();
+                },
+                success : function(data) {
+                    $('#loading').hide();
+                    write2Console(data);
+                },
+                error : function(data) {
+                    alert('Error:' + data.responseText);
+                }
+            })
+        };
+
+        function getJsonLength(jsonData) {
+            var jsonLength = 0;
+            for (var item in jsonData) {
+                jsonLength++;
+            }
+            return jsonLength;
+        }
+
+        function ignoreSpaces(str) {
+            var resultStr = "";
+            temp = str.split(" ");
+            for ( i = 0; i < temp.length; i++) {
+                resultStr += temp[i];
+            }
+            return resultStr;
+        }
+
+        function generateQuickFuncButtonList(data) {
+            // <ul class="nav nav-tabs" id="myTab">
+
+            // <li class="">
+            // <a data-toggle="tab" href="#home">Home</a>
+            // </li>
+
+            // <li class="dropdown">
+            // <a data-toggle="dropdown" class="dropdown-toggle" href="#">Dropdown <b class="caret"></b></a>
+            // <ul class="dropdown-menu">
+            // <li class="">
+            // <a data-toggle="tab" href="#dropdown1">@fat</a>
+            // </li>
+            // <li class="">
+            // <a data-toggle="tab" href="#dropdown2">@mdo</a>
+            // </li>
+            // </ul>
+            // </li>
+
+            // </ul>
+
+            // <div class="tab-content" id="myTabContent">
+            // <div id="home" class="tab-pane fade">
+            // <p>
+            // Raw denim you probably haven't heard of them jean shorts Austin. Nesciunt tofu stumptown aliqua, retro synth master cleanse. Mustache cliche tempor, williamsburg carles vegan helvetica. Reprehenderit butcher retro keffiyeh dreamcatcher synth. Cosby sweater eu banh mi, qui irure terry richardson ex squid. Aliquip placeat salvia cillum iphone. Seitan aliquip quis cardigan american apparel, butcher voluptate nisi qui.
+            // </p>
+            // </div>
+            // </div>
+
+            ulHtml = '<ul class="nav nav-tabs" id="myTab">';
+            contentHtml = '<div class="tab-content" id="myTabContent">';
+            $.each(data, function(lable) {
+                pythonObject = data[lable];
+                lable = ignoreSpaces(lable);
+                length = getJsonLength(pythonObject);
+                ulHtml += '<li class="dropdown">'
+                ulHtml += '<a data-toggle="dropdown" class="dropdown-toggle" href="#">' + lable + '<b class="caret"></b></a>';
+                ulHtml += '<ul class="dropdown-menu">';
+                $.each(pythonObject, function(key) {
+                    code = pythonObject[key];
+                    key = ignoreSpaces(key);
+                    ulHtml += '<li class=""><a data-toggle="tab" href="#' + key + '">' + key + '</a></li>';
+                    contentHtml += '<div id="' + key + '" class="tab-pane fade"><pre class="prettyprint linenums Lang-py">' + code + '</pre><p style="display:None">' + code + '</p></div>'
+                });
+                ulHtml += '</ul>';
+
+            });
+            ulHtml += '</ul>';
+            contentHtml += '</div>';
+            $('#qucikCodeArea').html(ulHtml + contentHtml);
+
+        };
+        function generateConfigSettingForm(data) {
+            // <div class="control-group">
+            // <label class="control-label" for="inputEmail">Email</label>
+            // <div class="controls">
+            // <input type="text" id="inputEmail" placeholder="Email">
+            // <input type="button" class="btn btn-info" value="Save"/>
+            // </div>
+            // </div>
+            $('#runTimesettingModalBody').html('');
+            modalBodyHtml = '';
+            $.each(data, function(key) {
+                comment = data[key][0];
+                value = data[key][1];
+                modalBodyHtml += '<div class="control-group">';
+                modalBodyHtml += '  <label class="control-label" for="' + key + '">' + comment + '</label>';
+                modalBodyHtml += '  <div class="controls">';
+                modalBodyHtml += '      <input type="text" id="' + key + '" placeholder="' + comment + '" value="' + value + '" name="runTimeSettingInput">';
+                modalBodyHtml += '      <input type="button" class="btn btn-info" id="' + key + 'Button" value="Save"/>';
+                modalBodyHtml += '  <div>';
+                modalBodyHtml += '<div>'
+            });
+            $('#runTimesettingModalBody').html(modalBodyHtml);
+            $.each(data, function(key) {
+                $('#' + key + 'Button').bind('click', function(event) {
+                    value = $('#' + key).val();
+                    runRemoteCode('/config_setting', {
+                        key : key,
+                        value : value
+                    });
+                });
+            });
+        }
+
+        function sendCode2Editor(code) {
+            context = editor.getValue();
+            editor.setValue(context + code);
+        };
+
+        $('#runButton').bind('click', function(event) {
+
+            codeSource = editor.getValue();
+            b64str = Base64.encode(codeSource);
+            data = {
+                'codeSource' : b64str
+            };
+            runRemoteCode('/debug', data);
+        });
+
+        $('#send2Editor').bind('click', function(event) {
+            sendCode2Editor($('#tempCode').text());
+        });
+
+        $('#onhourButton').bind('click', function(event) {
+            data = {
+                'event_type' : 1
+            };
+            runRemoteCode('/on_event', data);
+        });
+
+        $('#onDayButton').bind('click', function(event) {
+            data = {
+                'event_type' : 2
+            };
+            runRemoteCode('/on_event', data);
+        });
+
+        $('#onWeekdButton').bind('click', function(event) {
+            data = {
+                'event_type' : 3
+            };
+            runRemoteCode('/on_event', data);
+        });
+
+        $('#clearEditorButton').bind('click', function(event) {
+            editor.setValue('');
+        });
+
+        $('#clearConsoleButton').bind('click', function(event) {
+            console.setValue('');
+        });
+
+        $('#reloadButton').bind('click', function(event) {
+            is_reload_config = 0;
+            is_reload_db = 0;
+            if ($('#reload_config').attr('checked')) {
+                is_reload_config = 1
+            }
+            if ($('#reload_db').attr('checked')) {
+                is_reload_db = 1
+            }
+            data = {
+                'is_reload_config' : is_reload_config,
+                'is_reload_db' : is_reload_db,
+            };
+            runRemoteCode('/reload', data);
+        });
+        
+        $('#reloadButton').tooltip({title:'Reload可能会引发一系列不可预知的问题，请谨慎使用!',placement:'bottom'});
+
+        $('#Req_CacherPrintAllButton').bind('click', function(event) {
+            runRemoteCode('/req_cache_print_all', {});
+        });
+
+        $('#Req_CacherSaveDataButton').bind('click', function(event) {
+            runRemoteCode('/req_cache_save_data', {});
+        });
+
+        $('#killAllButton').bind('click', function(event) {
+            runRemoteCode('/kick_out_all', {});
+        });
+
+        $('#runTimeSettingModalButton').bind('click', function(event) {
+
+            //get remote config
+            $.ajax({
+                url : '/config_setting',
+                method : 'get',
+                dataType : 'json',
+                success : function(data) {
+                    generateConfigSettingForm(data);
+                    $('#runTimeSettingModal').modal('show');
+                },
+                error : function(data) {
+                    alert('Error:' + data.responseText);
+                }
+            });
+
+        });
+
+        function generateMessageSettingModal() {
+            $.ajax({
+                url : '/message_setting',
+                method : 'get',
+                dataType : 'json',
+                success : function(data) {
+                    // for module_name, dealer_ins in _module_ins_dct.items():
+                    // out_of_service, forbid_data = dealer_ins.get_msg_header_forbid_state_data()
+                    // module_data[module_name] = out_of_service, forbid_data
+                    $('#messageSettingModalBody').html();
+                    module_state = data.module_state;
+                    messageSettingModalHtml = '';
+                    moduleNameDict = {};
+                    accordionHtml = '<div class="accordion" id="messageSettingAccordion">';
+                    $.each(module_state, function(moduleFullName) {
+                        moduleData = module_state[moduleFullName];
+                        moduleFullNameList = moduleFullName.split('.');
+                        moduleName = moduleFullNameList[moduleFullNameList.length - 1];
+
+                        outOfService = moduleData[0];
+                        enableCount = moduleData[1];
+                        totalCount = moduleData[2];
+                        forbidData = moduleData[3];
+
+                        accordionHtml += '<div class="accordion-group">';
+                        accordionHtml += '<div class="accordion-heading">';
+                        accordionHtml += '<ul class="breadcrumb">';
+                        accordionHtml += '<li><a class="accordion-toggle myModule" data-toggle="collapse" data-parent="#messageSettingAccordion" href="#' + moduleName + '">';
+                        accordionHtml += moduleName + '    启用状态：  ';
+                        if (enableCount == totalCount) {
+                            accordionHtml += '<span class="text-success"> ' + enableCount + '</span><span class="divider">/</span><span class="text-info">' + totalCount + '</span></a></li>';
+                        } else {
+                            accordionHtml += '<span class="text-error"> ' + enableCount + '</span><span class="divider">/</span><span class="text-info">' + totalCount + '</span></a></li>';
+                        }
+                        if (outOfService) {
+                            accordionHtml += '<li><button class="btn btn-success" outOfService="0" id="' + moduleName + 'ModuleButton"><i class="icon-ok"></i>启用</button></li>';
+                        } else {
+                            accordionHtml += '<li><button class="btn btn-danger" outOfService="1" id="' + moduleName + 'ModuleButton"><i class="icon-remove"></i>禁用</button></li>';
+                        }
+                        accordionHtml += '</ul>';
+                        accordionHtml += '</div>';
+                        accordionHtml += '<div id="' + moduleName + '" class="accordion-body collapse">';
+                        accordionHtml += '<div class="accordion-inner">';
+                        tableHtml = '';
+                        tableHtml += '<table class="table">';
+                        tableHtml += '<thead>';
+                        tableHtml += '<tr>';
+                        tableHtml += '<th>header</th>';
+                        tableHtml += '<th>是否启用</th>';
+                        tableHtml += '<th>doc</th>';
+                        tableHtml += '<th>操作</th>';
+                        tableHtml += '</tr>';
+                        tableHtml += '</thead>';
+                        tableHtml += '<tbody>';
+                        headerList = [];
+                        $.each(forbidData, function(index) {
+                            forbidDataList = forbidData[index];
+                            header = forbidDataList[0];
+                            isForbid = forbidDataList[1];
+                            doc = forbidDataList[2];
+                            tableHtml += '<tr>';
+                            tableHtml += '<th>' + header + '</th>';
+                            tableHtml += '<th>' + isForbid + '</th>';
+                            tableHtml += '<th>' + doc + '</th>';
+                            if (isForbid == 0) {
+                                tableHtml += '<th><button class="btn btn-success" isForbid="0" id="header' + header + 'Button">启用</button><th>';
+                            } else {
+                                tableHtml += '<th><button class="btn btn-danger" isForbid="1" id="header' + header + 'Button">禁用</button><th>';
+                            }
+                            tableHtml += '</tr>';
+                            headerList.push(header);
+                        });
+                        tableHtml += '</tbody>';
+                        tableHtml += '</table>';
+                        accordionHtml += tableHtml;
+                        accordionHtml += '</div>';
+                        // end of accordion-inner
+                        accordionHtml += '	</div>';
+                        // end of accordion-body
+                        accordionHtml += '		</div>';
+                        //enf of  accordion-group
+                        moduleNameDict[moduleName] = headerList;
+                    });
+                    accordionHtml += '</div>';
+                    messageSettingModalHtml += accordionHtml;
+                    $('#messageSettingModalBody').html(messageSettingModalHtml);
+                    $.each(moduleNameDict, function(moduleName) {
+                        headerList = moduleNameDict[moduleName];
+                        $('#' + moduleName + 'ModuleButton').bind('click', function(event) {
+                            outOfService = $(this).attr('outOfService');
+                            $.post('/message_setting', {
+                                module_name : moduleName,
+                                out_of_service : outOfService,
+                            }, function(data) {
+                                write2Console(data);
+                                generateMessageSettingModal();
+                            });
+                        });
+                        $.each(headerList, function(index) {
+                            var header = headerList[index];
+                            $('#header' + header + 'Button').bind('click', function(event) {
+                                isForbid = $(this).attr('isForbid');
+                                $.post('/message_setting', {
+                                    module_name : moduleName,
+                                    out_of_service : outOfService,
+                                    header : header,
+                                    is_forbid : isForbid,
+                                }, function(data) {
+                                    write2Console(data);
+                                    generateMessageSettingModal();
+                                });
+                            });
+                        });
+                    });
+                    $('#messageSettingModal').modal('show');
+                },
+                error : function(data) {
+                    alert('Error:' + data.responseText);
+                }
+            });
+        }
+
+
+        $('#messageSettingModalButton').bind('click', function(event) {
+            generateMessageSettingModal();
+        });
+
+        function generateMapSettingModal() {
+            $.ajax({
+                url : '/map_setting',
+                method : 'get',
+                dataType : 'json',
+                success : function(data) {
+                    $('#mapListBody').html('');
+                    mapIdList = [];
+                    mapListHtml = '';
+                    $.each(data.map_data, function(index) {
+                        map = data.map_data[index];
+                        mapId = map[0];
+                        mapName = map[1];
+                        isFB = map[2];
+                        isDisabled = map[3];
+                        mapIdList.push(mapId);
+                        mapListHtml += '<tr>';
+                        mapListHtml += '<td>' + mapId + '</td>';
+                        mapListHtml += '<td>' + mapName + '</td>';
+                        mapListHtml += '<td>' + isFB + '</td>';
+                        mapListHtml += '<td>' + isDisabled + '</td>';
+                        if (isDisabled == 1) {
+                            mapListHtml += '<td><button class="btn btn-success" id="mapButton' + mapId + '" isDisabled="0"><i class="icon-ok"></i>启用</button></td>';
+                        } else {
+                            mapListHtml += '<td><button class="btn btn-danger" id="mapButton' + mapId + '" isDisabled="1"><i class="icon-remove"></i>禁用</button></td>';
+                        }
+                        mapListHtml += '</tr>';
+                    })
+                    $('#mapListBody').html(mapListHtml);
+                    $.each(mapIdList, function(index) {
+                        var mapId = mapIdList[index];
+                        $('#mapButton' + mapId).bind('click', function(evnet) {
+                            isDisabled = $(this).attr('isDisabled');
+                            mapId = mapId;
+                            runRemoteCode('/map_setting', {
+                                'map_id' : mapId,
+                                'is_disabled' : isDisabled
+                            });
+                            generateMapSettingModal();
+                        });
+                    });
+                    $('#mapSettingModal').modal('show');
+                },
+                error : function(data) {
+                    alert('Error:' + data.responseText);
+                }
+            });
+        };
+
+        $('#mapSettingModalButton').bind('click', function(event) {
+            //get remote config
+            generateMapSettingModal();
+        });
+
+        //get remote js
+        $.ajax({
+            url : '/quick_code',
+            method : 'get',
+            dataType : 'json',
+            success : function(data) {
+                generateQuickFuncButtonList(data);
+                prettyPrint();
+                $('#myTab a').click(function(e) {
+                    e.preventDefault();
+                    $(this).tab('show');
+                    contextId = $(this).tab().attr('href');
+                    if (contextId == '#') {
+                        return;
+                    }
+                    code = $('' + contextId + ' p').text();
+                    $('#tempCode').text(code);
+                })
+            },
+            error : function(data) {
+                alert('Error:' + data.responseText);
+            }
+        });
+
+        $.ajax({
+            url : '/first_run_datetime',
+            method : 'get',
+            dataType : 'json',
+            success : function(data) {
+
+                dateTimePickerHtml = '<div class="input-append date form_datetime" data-date="' + data.first_run + '">';
+                dateTimePickerHtml += '<input style = "width:120px" size="10" type="text" value="' + data.first_run + '" readonly id="firstRunTime">';
+                dateTimePickerHtml += '<span class="add-on"><i  class="icon-th btn-group"></i></span>';
+                dateTimePickerHtml += '<label class="btn btn-primary" id="setFirstRunButton"><i class="icon-ok"></i>保存已经设置的第一次开服时间</label><br>';
+
+                dateTimePickerHtml += '</div>';
+
+                $('#dataTimePicker').html(dateTimePickerHtml);
+
+                $('#setFirstRunButton').bind('click', function(event) {
+                    firstRunTime = $('#firstRunTime').val();
+                    $.post('/first_run_datetime', {
+                        'first_run' : firstRunTime,
+                    }, function(data) {
+                        write2Console(data);
+                    });
+                })
+                $(".form_datetime").datetimepicker({
+                    format : "yyyy-mm-dd hh:ii:ss",
+                    // format: "dd MM yyyy - hh:ii",
+                    autoclose : true,
+                    todayBtn : true,
+                    minuteStep : 10,
+                });
+            },
+            error : function(data) {
+                alert('Error:' + data.responseText);
+            }
+        });
+
+    });
+
+</script>
+<hr class="bs-docs-separator">
+<div class="container-fluid">
+	<div class="row-fluid">
+		<div class="span7">
+			<div class="btn-group">
+				<button class="btn btn-success" id='runButton'>
+					<i class="icon-play"></i>
+					运行
+				</button>
+				<button class="btn btn-info " id='reloadButton'>
+					<i class="icon-repeat"></i>
+					Reload
+				</button>
+				<label class="btn btn-info ">
+					<input type="checkbox" id="reload_config" name="reload_config">
+					<i class=" icon-th-large"></i> Reload Config </label>
+				<label class="btn btn-info ">
+					<input type="checkbox" id='reload_db' name="reload_db">
+					<i class=" icon-th-large"></i> Reload DB </label>
+
+				<button class="btn btn-danger" id="clearEditorButton">
+					<i class="icon-trash"></i>
+					Clear
+				</button>
+
+			</div>
+			<textarea name="codeSource" id="codeSource" style="display: none; ">
+      		</textarea>
+			<hr class="bs-docs-separator">
+			<div class="btn-group">
+
+				<button class="btn btn-danger" id="clearConsoleButton">
+					<i class="icon-trash"></i>
+					Clear
+				</button>
+			</div>
+			<img src="/static/img/ajaxLoader.gif"  id='loading'/>
+			<textarea name="codeSource" id="console" name="console" style="display: none; ">
+      		</textarea>
+		</div>
+		<div class="span4">
+			<button class="btn btn-danger" id='killAllButton'>
+				踢掉所有在线玩家
+			</button>
+			<br>
+			<hr ="class="bs-docs-separator"">
+
+			<div id="dataTimePicker"></div>
+			<hr ="class="bs-docs-separator"">
+			<div class=btn-group>
+				<div>
+					<button class="btn btn-success" id="runTimeSettingModalButton">
+						<i class="icon-wrench"></i>
+						运行时参数设置
+					</button>
+					<button class="btn btn-success" id="messageSettingModalButton">
+						<i class="icon-wrench"></i>
+						消息禁用/解禁
+					</button>
+					<button class="btn btn-success" id="mapSettingModalButton">
+						<i class="icon-wrench"></i>
+						地图禁用/解禁
+					</button>
+					<button class="btn btn btn-success" id='Req_CacherPrintAllButton'>
+						Print Cacher Info
+					</button>
+					<button class="btn btn btn-success" id='Req_CacherSaveDataButton'>
+						Save All Cacher
+					</button>
+				</div>
+				<hr ="class="bs-docs-separator"">
+				<div>
+					<button class="btn btn-info" id='onhourButton'>
+						on_hour
+					</button>
+					<button class="btn btn-info" id='onDayButton'>
+						on_day
+					</button>
+					<button class="btn btn-info" id='onWeekdButton'>
+						on_week
+					</button>
+				</div>
+
+			</div>
+			<hr class="bs-docs-separator">
+			<div style="height: 217px"></div>
+			<hr ="class="bs-docs-separator"">
+			<div id="qucikCodeArea"></div>
+			<div class="btn-group">
+				<button class="btn btn-large" id="send2Editor">
+					Send to Editor
+				</button>
+				<div style="display: None" id="tempCode"></div>
+			</div>
+		</div>
+	</div>
+</div>
+
+<!-- Modal -->
+<div id="runTimeSettingModal" class="modal hide fade" tabindex="-1" role="dialog" aria-labelledby="runTimeSettingModalLabel" aria-hidden="true">
+	<div class="modal-header">
+		<button type="button" class="close" data-dismiss="modal" aria-hidden="true">
+			×
+		</button>
+		<h3 id="runTimeSettingModalLabel">运行时参数设置 </h3>
+	</div>
+	<div class="modal-body" id="runTimesettingModalBody"></div>
+</div>
+<div id="messageSettingModal" class="modal hide fade" tabindex="-1" role="dialog" aria-labelledby="messageSettingModalLabel" aria-hidden="true">
+	<div class="modal-header">
+		<button type="button" class="close" data-dismiss="modal" aria-hidden="true">
+			×
+		</button>
+		<h3 id="messageSettingModalLabel">消息禁用/接禁 </h3>
+	</div>
+	<div class="modal-body" id="messageSettingModalBody">
+		<table class="table">
+			<div class="page-header">
+				xia
+			</div>
+			<thead>
+				<tr>
+					<th>地图id</th>
+					<th>地图名</th>
+					<th>副本id</th>
+					<th>是否禁用</th>
+					<th>操作</th>
+				</tr>
+			</thead>
+			<tbody id="messageListBody"></tbody>
+		</table>
+	</div>
+</div>
+<div id="mapSettingModal" class="modal hide fade" tabindex="-1" role="dialog" aria-labelledby="mapSettingModalLabel" aria-hidden="true">
+	<div class="modal-header">
+		<button type="button" class="close" data-dismiss="modal" aria-hidden="true">
+			×
+		</button>
+		<h3 id="mapSettingModalLabel">地图禁用/接禁 </h3>
+	</div>
+	<div class="modal-body">
+		<table class="table">
+			<thead>
+				<tr>
+					<th>地图id</th>
+					<th>地图名</th>
+					<th>副本id</th>
+					<th>是否禁用</th>
+					<th>操作</th>
+				</tr>
+			</thead>
+			<tbody id="mapListBody"></tbody>
+		</table>
+	</div>
+</div>
+{% endblock %}
